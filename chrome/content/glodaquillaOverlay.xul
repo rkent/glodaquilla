@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE overlay SYSTEM 'chrome://glodaquilla/locale/glodaquilla.dtd'>
+<overlay id='glodaquillaOverlay'
+	xmlns='http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul'>
+  <script type='application/x-javascript' src='chrome://glodaquilla/content/glodaquillaOverlay.js'/>
+  <!-- add custom columns to thread tree -->
+  <tree id="threadTree">
+    <treecols id="threadCols">
+      <splitter class="tree-splitter" />
+      <treecol id="colOffline" persist="hidden ordinal"
+             tooltiptext="&colOffline.tooltiptext;"
+             label="onDisk" fixed="true"
+             class="treecol-image" src="chrome://glodaquilla/skin/good.png" />
+      <splitter class="tree-splitter" />
+      <treecol id="colGlodaId" persist="hidden ordinal width"
+             tooltiptext="&colGlodaId.tooltiptext;"
+             label="gloda id"
+             class="treecol-image" src="chrome://glodaquilla/skin/number.png"/>
+      <splitter class="tree-splitter" />
+      <treecol id="colGlodaDirty" persist="hidden ordinal width"
+             tooltiptext="&colGlodaDirty.tooltiptext;"
+             label="gloda dirty"
+             class="treecol-image" src="chrome://glodaquilla/skin/questions.png"/>
+    </treecols>
+  </tree>
+<!-- -->
+</overlay>
