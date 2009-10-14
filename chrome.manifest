@@ -1,4 +1,4 @@
-content     glodaquilla  chrome/content/
+content     glodaquilla  content/
 overlay     chrome://messenger/content/messenger.xul chrome://glodaquilla/content/glodaquillaOverlay.xul
-skin        glodaquilla classic   chrome/skin/
-locale      glodaquilla en-US     chrome/locale/en-US/
+skin        glodaquilla classic   skin/
+locale      glodaquilla en-US     locale/en-US/
