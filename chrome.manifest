@@ -1,4 +1,7 @@
 content     glodaquilla  content/
-overlay     chrome://messenger/content/messenger.xul chrome://glodaquilla/content/glodaquillaOverlay.xul
+resource    glodaquilla  content/
+overlay     chrome://messenger/content/messenger.xul      chrome://glodaquilla/content/glodaquillaOverlay.xul
+overlay     chrome://messenger/content/folderProps.xul    chrome://glodaquilla/content/folderPropsOverlay.xul
+overlay     chrome://messenger/content/AccountManager.xul chrome://glodaquilla/content/AccountManagerOverlay.xul
 skin        glodaquilla classic   skin/
 locale      glodaquilla en-US     locale/en-US/
