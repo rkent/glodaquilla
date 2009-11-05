@@ -35,22 +35,79 @@ var EXPORTED_SYMBOLS = ["InheritedPropertiesGrid"];
 
 const Cc = Components.classes;
 const Ci = Components.interfaces;
+const Cu = Components.utils;
+const catMan = Cc["@mozilla.org/categorymanager;1"]
+                 .getService(Ci.nsICategoryManager);
 
 var InheritedPropertiesGrid = {
 
-  // this is needed because we may include this module with different extensions,
-  // each of which will have their own chrome path to the needed strings.
-  setStrings: function setStrings(aMesquillaStrings)
+  /*
+   * Management of property objects. These objects are used to store information
+   *  needed to manage a single inherited property. Definition:
+   *
+   *    property     (string) the inherited property key
+   *    name         (string) localized display name for the property
+   *    defaultValue (function (nsIMsgFolder or nsIMsgIncomingServer), returns boolean)
+   *                          the default value when no inherited property is applied
+   *    accesskey    (string) accesskey attribute for entries
+   *    hidefor      (string) list of server types for which the property is invalid
+   */
+
+  // register a new property object
+  addPropertyObject: function addPropertyObject(aPropertyObject)
   {
-    this._strings = aMesquillaStrings;
+    /*
+     * For each inherited property that has been registered with
+     *  InheritedPropertiesGrid, the hidefor values are stored in the category
+     *  manager. The "category" is "InheritedPropertiesGrid", each of the entry
+     *  keys is toSource() version of the object. This is used to maintain a
+     *  single shared registry of properties.
+     */
+    catMan.addCategoryEntry("InheritedPropertiesGrid",
+                            aPropertyObject.property,
+                            aPropertyObject.toSource(),
+                            false /* aPersist */,
+                            true /* aReplace */);
+    return;
   },
+
+  // given the property key, return the registered property object
+  getPropertyObject: function getPropertyObject(aProperty)
+  {
+    let value = catMan.getCategoryEntry("InheritedPropertiesGrid", aProperty);
+    if (value)
+      return eval(value);
+    throw "Inherited property " + aProperty + " not registered";
+    return null;
+   },
+
+  // This function implements most of the onPreInit function for setting
+  //  up an account manager extension for inherited properties.
+  onPreInit: function onPreInit(account, accountValues, window)
+  { try {
+    let server = account.incomingServer;
+    window.gInheritTarget = server;
+    let rows = this.getInheritRows(window.document);
+    // Add rows for defined properties. These are defined through entries
+    //  in the category manager.
+    let catEnum = catMan.enumerateCategory("InheritedPropertiesGrid");
+    while (catEnum.hasMoreElements()) {
+      let property = catEnum.getNext()
+                            .QueryInterface(Components.interfaces.nsISupportsCString)
+                            .data;
+      let row = this.createInheritRow(property, server, window.document, true);
+      if (row) // don't add if it already exists, probably a prior extension uses it
+        rows.appendChild(row);
+    }
+
+  } catch (e) {Cu.reportError(e);}},
 
   _strings: null,
 
   // Create or get a 3-column grid to describe inherited variables for the
   //  folder properties xul. Account Manager uses an overlay.
   getInheritRows: function getInheritRows(document)
-  {
+  { try {
     /* this is what we are creating, and adding to the GeneralPanel
     <vbox id="inheritBox">
       <grid>
@@ -78,13 +135,23 @@ var InheritedPropertiesGrid = {
     if (rows)
       return rows;
 
+    const strings = Cc["@mozilla.org/intl/stringbundle;1"]
+                      .getService(Ci.nsIStringBundleService)
+                      .createBundle("chrome://glodaquilla/locale/am-inheritPane.properties");
+
     // create new vbox
     let inheritBox = document.createElement("vbox");
     inheritBox.setAttribute("id", "inheritBox");
 
     // now append into the existing xul
-    document.getElementById("GeneralPanel")
-            .appendChild(inheritBox);
+    try {
+      document.getElementById("GeneralPanel")
+              .appendChild(inheritBox);
+    } catch (e) {
+      // must be SeaMonkey
+      let nameBox = document.getElementById('nameBox');
+      nameBox.parentNode.appendChild(inheritBox);
+    }
 
     // create the grid and its children
     let grid = document.createElement("grid");
@@ -117,11 +184,11 @@ var InheritedPropertiesGrid = {
     row.appendChild(label1);
 
     let label2 = document.createElement("label");
-    label2.setAttribute("value", this._strings.GetStringFromName("mesquilla.enabled"));
+    label2.setAttribute("value", strings.GetStringFromName("enabled"));
     row.appendChild(label2);
 
     let label3 = document.createElement("label");
-    label3.setAttribute("value", this._strings.GetStringFromName("mesquilla.inherit"));
+    label3.setAttribute("value", strings.GetStringFromName("inherit"));
     row.appendChild(label3);
 
     rows.appendChild(row);
@@ -129,15 +196,10 @@ var InheritedPropertiesGrid = {
     // add it all to the panel
     inheritBox.appendChild(grid);
     return rows;
-  },
+  } catch(e) {Cu.reportError(e);}},
 
   /** create a row element for an inherited property on the account manager
-   * @param aPropertyObject  descriptor for the inherited property, with these fields:
-   *
-   *                         default:  value if no inherited property found (boolean)
-   *                         name:     localized description of the property (string)
-   *                         property: inherited property (string)
-   *                         hidefor:  server types to hide the property
+   * @param aProperty  inherited property (string)
    *
    * @param aFolder  either an nsIMsgFolder or nsIMsgIncomingServer as the target of
    *                 the inherited property
@@ -146,22 +208,22 @@ var InheritedPropertiesGrid = {
    * @param aIsAccountManager  true if row in account manager
    */
 
-  createInheritRow: function createInheritRow(aPropertyObject, aFolder, document, aIsAccountManager)
+  createInheritRow: function createInheritRow(aProperty, aFolder, document, aIsAccountManager)
   { try {
 
     /* We are creating this:
 
        <row hidefor="<hidefor>" id="property-<property>">
-         <label value="<aName>" />
+         <label value="<aName>" accesskey="<accesskey>" control=="inherit-"+property />
          <hbox pack="center">
            <checkbox id="enable-"+property
                      oncommand="InheritedPropertiesGrid.onCommandEnable(
-            '<property>' ,gInheritTarget, document, (parent.)gInheritPropertyObjects);" />
+            '<property>' ,gInheritTarget, document);" />
          </hbox>
          <hbox pack="center">
            <checkbox id="inherit-"+property
                      oncommand="InheritedPropertiesGrid.onCommandInherit(
-            '<property>' ,gInheritTarget, document, (parent.)gInheritPropertyObjects);" />
+            '<property>' ,gInheritTarget, document);" />
          </hbox>
          <text id="server.<property>"
                inheritProperty="<property>"
@@ -177,23 +239,23 @@ var InheritedPropertiesGrid = {
         "true" or "false" when an inherited boolean is defined.
     */
 
-    let property = aPropertyObject.property;
+    let property = aProperty;
+    let propertyObject = this.getPropertyObject(property);
 
     let row = document.getElementById("property-" + property);
-    if (row) // perhaps another extension already added this
-      return null;
+    if (row)
+      row.parentNode.removeChild(row);
     row = document.createElement("row");
     row.setAttribute("id", "property-" + property);
-    if (aIsAccountManager && aPropertyObject.hidefor)
-      row.setAttribute("hidefor", aPropertyObject.hidefor);
+    if (aIsAccountManager && propertyObject.hidefor)
+      row.setAttribute("hidefor", propertyObject.hidefor);
 
     let label = document.createElement("label");
-    label.setAttribute("value", aPropertyObject.name);
+    label.setAttribute("value", propertyObject.name);
+    label.setAttribute("accesskey", propertyObject.accesskey);
+    label.setAttribute("control", "inherit-" + property);
     row.appendChild(label);
 
-    // In the account manager, gInheritPropertyObjects is defined
-    //  on the parent window.
-    let parentPrefix = aIsAccountManager ? "parent." : "";
     let enableHbox = document.createElement("hbox");
     enableHbox.setAttribute("pack", "center");
     let enableCheckbox = document.createElement("checkbox");
@@ -202,8 +264,7 @@ var InheritedPropertiesGrid = {
     if (aIsAccountManager)
       enableCheckbox.setAttribute("oncommand",
         "InheritedPropertiesGrid.onCommandEnable('" + property + 
-        "' ,gInheritTarget, document, " +
-        parentPrefix + "gInheritPropertyObjects);");
+        "' ,gInheritTarget, document);");
     enableHbox.appendChild(enableCheckbox);
     row.appendChild(enableHbox);
 
@@ -213,8 +274,7 @@ var InheritedPropertiesGrid = {
     inheritCheckbox.setAttribute("id", "inherit-" + property);
     inheritCheckbox.setAttribute("oncommand",
       "InheritedPropertiesGrid.onCommandInherit('" + property + 
-      "' ,gInheritTarget, document, " +
-      parentPrefix + "gInheritPropertyObjects);");
+      "' ,gInheritTarget, document);");
     inheritHbox.appendChild(inheritCheckbox);
     row.appendChild(inheritHbox);
 
@@ -241,7 +301,7 @@ var InheritedPropertiesGrid = {
 
     // aFolder can be either an nsIMsgIncomingServer or an nsIMsgFolder
     if (aFolder instanceof Ci.nsIMsgIncomingServer)
-      server = aFolder
+      server = aFolder;
     else if (aFolder.isServer)
       server = aFolder.server;
 
@@ -273,33 +333,25 @@ var InheritedPropertiesGrid = {
     if (isInherited)
       inheritCheckbox.setAttribute("checked", "true");
 
-    let isEnabled = aPropertyObject.defaultValue(aFolder) ? inheritedValue != "false" :
-                                                   inheritedValue == "true";
-
+    let isEnabled = propertyObject.defaultValue(aFolder) ? inheritedValue != "false" :
+                                                           inheritedValue == "true";
     enableCheckbox.setAttribute("checked", isEnabled ? "true" : "false");
     if (isInherited)
       enableCheckbox.setAttribute("disabled", "true");
 
     return row;
 
-  } catch (e) {dump("error in createInheritRow: error " + e + "\n");}},
+  } catch (e) {Cu.reportError(e);}},
 
-  onCommandInherit: function onCommandInherit(property, aFolder, document, aInheritPropertyObjects)
+  onCommandInherit: function onCommandInherit(property, aFolder, document)
   { try {
 
     // find the property object
-    let aPropertyObject;
-    for (let i = 0; i < aInheritPropertyObjects.length; i++)
-    {
-      aPropertyObject = aInheritPropertyObjects[i];
-      if (aPropertyObject.property == property)
-        break;
-    }
-    if (aPropertyObject.property != property)
-      throw ("property " + property + " not found in property object list\n");
+    let propertyObject = this.getPropertyObject(property);
+
     // Whether a property is "enabled" depends on its default, since the
     //  inherited folder property is usually an override. 
-    let defaultValue = aPropertyObject.defaultValue(aFolder);
+    let defaultValue = propertyObject.defaultValue(aFolder);
 
     let elementInherit = document.getElementById("inherit-" + property);
     let elementEnable = document.getElementById("enable-" + property);
@@ -326,23 +378,16 @@ var InheritedPropertiesGrid = {
       elementText.setAttribute("value", "");
     }
     else
+    {
       elementText.setAttribute("value", elementEnable.checked ? "true" : "false");
+      elementEnable.focus();
+    }
 
-  } catch (e) {dump("error in onCommandInherit: " + e + "\n");}},
+  } catch (e) {Cu.reportError(e);}},
 
   // this function is only used in the account manager.
-  onCommandEnable: function onCommandEnable(property, aFolder, document, aInheritPropertyObjects)
+  onCommandEnable: function onCommandEnable(property, aFolder, document)
   { try {
-    // find the property object
-    let aPropertyObject;
-    for (let i = 0; i < aInheritPropertyObjects.length; i++)
-    {
-      aPropertyObject = aInheritPropertyObjects[i];
-      if (aPropertyObject.property == property)
-        break;
-    }
-    if (aPropertyObject.property != property)
-      throw ("property " + property + " not found in property object list\n");
 
     let elementEnable = document.getElementById("enable-" + property);
     let isEnabledString = elementEnable.checked ? "true" : "false";
@@ -351,15 +396,13 @@ var InheritedPropertiesGrid = {
     //  persisting the preference.
     let elementText = document.getElementById("server." + property);
     elementText.setAttribute("value", isEnabledString);
-  } catch (e) {dump("error in onCommandEnable: " + e + "\n");}},
+  } catch (e) {Cu.reportError(e);}},
 
   // This function does not work with the account manager, which has its
   //  own mechanism for accepting preferences.
-  // XXX to do: consider using a string property parameter so that it acts like
-  //            the other functions.
-  onAcceptInherit: function onAcceptInherit(aPropertyObject, aFolder, document)
+  onAcceptInherit: function onAcceptInherit(aProperty, aFolder, document)
   { try {
-    let property = aPropertyObject.property;
+    let property = aProperty;
     let elementInherit = document.getElementById("inherit-" + property);
     let elementEnable = document.getElementById("enable-" + property);
 
@@ -386,5 +429,5 @@ var InheritedPropertiesGrid = {
       else
         aFolder.setStringProperty(property, value);
     }
-  } catch (e) {dump("error in onAcceptInherit: error " + e + "\n");}}
+  } catch (e) {Cu.reportError(e);}}
 }

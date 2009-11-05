@@ -1,6 +1,6 @@
 /*
  ***** BEGIN LICENSE BLOCK *****
- * This file is part of the application GlodaQuilla by Mesquilla.
+ * This file is part of an application by Mesquilla.
  *
  * This application is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,30 +27,13 @@
  * ***** END LICENSE BLOCK *****
  */
 
-// Make sure that only the first load of this module, by global name, is loaded
-if (typeof InheritedPropertiesGrid == "undefined")
-{
-  Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
-  InheritedPropertiesGrid.setStrings(
-    Components.classes["@mozilla.org/intl/stringbundle;1"]
-                      .getService(Components.interfaces.nsIStringBundleService)
-                      .createBundle("chrome://glodaquilla/locale/mesquilla.properties"));
-}
+Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
 
 function onPreInit(account, accountValues)
 {
   let server = account.incomingServer;
   window.gInheritTarget = server;
-  let rows = InheritedPropertiesGrid.getInheritRows(document);
-  // Add rows for defined properties. These are defined through overlays on the
-  //  parent window into an array gInheritPropertyObjects
-  for (let i = 0; i < parent.gInheritPropertyObjects.length; i++)
-  {
-    let row = InheritedPropertiesGrid.createInheritRow(parent.gInheritPropertyObjects[i],
-                                                       server, document, true);
-    if (row) // don't add it already exists, probably a prior extension uses it
-      rows.appendChild(row);
-  }
+  InheritedPropertiesGrid.onPreInit(account, accountValues, window);
 
   let type = parent.getAccountValue(account, accountValues, "server", "type", null, false);
   hideShowControls(type);

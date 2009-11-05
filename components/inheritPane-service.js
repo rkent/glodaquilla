@@ -1,6 +1,6 @@
 /*
  ***** BEGIN LICENSE BLOCK *****
- * This file is part of the application GlodaQuilla by Mesquilla.
+ * This file is part of an application by Mesquilla.
  *
  * This application is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,16 +28,36 @@
  */
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+const catMan = Components.classes["@mozilla.org/categorymanager;1"]
+                         .getService(Components.interfaces.nsICategoryManager);
 
 function inheritPane() {
 }
 
 inheritPane.prototype = {
   name: "inheritPane",
-  chromePackageName: "glodaquilla", // This should be the extension that
-                                    //  contains the am-inheritPane.* files
-  showPanel: function(server) {
-    return true;
+  // This should be the extension that
+  //  contains the am-inheritPane.* files
+  chromePackageName: "glodaquilla", 
+  showPanel: function showPanel(server) {
+    /*
+     * For each inherited property that has been registered with
+     *  InheritedPropertiesGrid, the hidefor values are stored in the category
+     *  manager as part of the property object.
+     */
+     let catEnum = catMan.enumerateCategory("InheritedPropertiesGrid");
+     let type = server.type;
+     let show = false; // have we found a non-hidden entry?
+     while (!show && catEnum.hasMoreElements()) {
+       let entry = catEnum.getNext()
+                          .QueryInterface(Components.interfaces.nsISupportsCString)
+                          .data;
+       let value = catMan.getCategoryEntry("InheritedPropertiesGrid", entry);
+       let propertyObject = eval(value);
+       if (propertyObject.hidefor.indexOf(type) == -1) // then we should show this entry
+         show = true;
+     }
+    return show;
   },
 
   QueryInterface: XPCOMUtils.generateQI([Components.interfaces.nsIMsgAccountManagerExtension]),

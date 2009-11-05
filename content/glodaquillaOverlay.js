@@ -31,6 +31,30 @@ Components.utils.import("resource://app/modules/gloda/indexer.js");
 Components.utils.import("resource://app/modules/gloda/gloda.js");
 Components.utils.import("resource://glodaquilla/GlodaQuillaIndexerOverlay.jsm");
 
+Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
+
+const glodaquillaStrings = Components.classes["@mozilla.org/intl/stringbundle;1"]
+                             .getService(Components.interfaces.nsIStringBundleService)
+                             .createBundle("chrome://glodaquilla/locale/glodaquilla.properties");
+
+var glodaDoIndex = {
+  defaultValue: function defaultValue(aFolder) {
+    // aFolder can be either an nsIMsgIncomingServer or an nsIMsgFolder
+    let server;
+    if (aFolder instanceof Components.interfaces.nsIMsgIncomingServer)
+      server = aFolder;
+    else
+      server = aFolder.server;
+    return (server.type != "nntp");
+  },
+  name: glodaquillaStrings.GetStringFromName("indexInGlobalDatabase"),
+  accesskey: glodaquillaStrings.GetStringFromName("indexInGlobalDatabase.accesskey"),
+  property: "glodaDoIndex",
+  hidefor: "nntp"
+};
+
+InheritedPropertiesGrid.addPropertyObject(glodaDoIndex);
+
 var columnHandlerGlodaDirty = {
    getCellText:         function(row, col) {
       // get the message's header so that we can extract the field

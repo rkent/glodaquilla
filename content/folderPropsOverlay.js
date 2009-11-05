@@ -31,15 +31,7 @@
  // filter properties xul to make a normal overlay possible, so instead we have
  // to add our xul dynamically.
 
-// Make sure that only the first load of this module, by global name, is loaded
-if (typeof InheritedPropertiesGrid == "undefined")
-{
-  Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
-  InheritedPropertiesGrid.setStrings(
-    Components.classes["@mozilla.org/intl/stringbundle;1"]
-                      .getService(Components.interfaces.nsIStringBundleService)
-                      .createBundle("chrome://glodaquilla/locale/mesquilla.properties"));
-}
+Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
  
 (function()
 {
@@ -52,30 +44,9 @@ if (typeof InheritedPropertiesGrid == "undefined")
   // module-level variables
   const Cc = Components.classes;
   const Ci = Components.interfaces;
-
-  const glodaquillaStrings = Cc["@mozilla.org/intl/stringbundle;1"]
-                               .getService(Ci.nsIStringBundleService)
-                               .createBundle("chrome://glodaquilla/locale/glodaquilla.properties");
+  const Cu = Components.utils;
 
   let folder; // nsIMsgFolder passed to the window
-
-  // standard format for inherited property rows
-  //   defaultValue:  value if inherited property missing (boolean true or false)
-  //   name:          localized display name
-  //   property:      inherited property name
-  let glodaDoIndex = {
-    defaultValue: function defaultValue(aFolder) {
-      // aFolder can be either an nsIMsgIncomingServer or an nsIMsgFolder
-      let server;
-      if (aFolder instanceof Ci.nsIMsgIncomingServer)
-        server = aFolder
-      else
-        server = aFolder.server;
-      return (server.type != "nntp");
-    },
-    name: glodaquillaStrings.GetStringFromName("glodaquilla.indexInGlobalDatabase"),
-    property: "glodaDoIndex"
-  };
 
   self.onLoad = function onLoad(e)
   {
@@ -88,13 +59,10 @@ if (typeof InheritedPropertiesGrid == "undefined")
       return;
 
     window.gInheritTarget = folder;
-    if (typeof(gInheritPropertyObjects) == "undefined")
-      window.gInheritPropertyObjects = [];
-    gInheritPropertyObjects.push(glodaDoIndex);
 
     // create or get the rows from the inherit grid
     let rows = InheritedPropertiesGrid.getInheritRows(document);
-    let row = InheritedPropertiesGrid.createInheritRow(glodaDoIndex, folder, document);
+    let row = InheritedPropertiesGrid.createInheritRow("glodaDoIndex", folder, document);
     if (row)  // false means another extension is handling this, so quit
     {
       rows.appendChild(row);
@@ -107,7 +75,7 @@ if (typeof InheritedPropertiesGrid == "undefined")
 
   self.onAcceptInherit = function glodaDoIndexOnAcceptInherit()
   {
-    InheritedPropertiesGrid.onAcceptInherit(glodaDoIndex, folder, document);
+    InheritedPropertiesGrid.onAcceptInherit("glodaDoIndex", folder, document);
   }
 
 })();
