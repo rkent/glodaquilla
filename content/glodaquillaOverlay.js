@@ -27,7 +27,7 @@
  * ***** END LICENSE BLOCK *****
  */
 
-Components.utils.import("resource://app/modules/gloda/indexer.js");
+Components.utils.import("resource://app/modules/gloda/datamodel.js");
 Components.utils.import("resource://app/modules/gloda/gloda.js");
 Components.utils.import("resource://glodaquilla/GlodaQuillaIndexerOverlay.jsm");
 
@@ -39,13 +39,16 @@ const glodaquillaStrings = Components.classes["@mozilla.org/intl/stringbundle;1"
 
 var glodaDoIndex = {
   defaultValue: function defaultValue(aFolder) {
+    Components.utils.import("resource://app/modules/gloda/datastore.js");
+    Components.utils.import("resource://app/modules/gloda/datamodel.js");
+
     // aFolder can be either an nsIMsgIncomingServer or an nsIMsgFolder
-    let server;
     if (aFolder instanceof Components.interfaces.nsIMsgIncomingServer)
-      server = aFolder;
-    else
-      server = aFolder.server;
-    return (server.type != "nntp");
+      return (aFolder.type != "nntp");
+
+    // get the default value from gloda
+    let glodaFolder = GlodaDatastore._mapFolder(aFolder);
+    return (glodaFolder._indexingPriority != GlodaFolder.prototype.kIndexingNeverPriority);
   },
   name: glodaquillaStrings.GetStringFromName("indexInGlobalDatabase"),
   accesskey: glodaquillaStrings.GetStringFromName("indexInGlobalDatabase.accesskey"),
@@ -139,13 +142,20 @@ function doGlodaquillaOnceLoaded() {
   ObserverService.addObserver(CreateGlodaquillaDbObserver, "MsgCreateDBView", false);
   CreateGlodaquillaDbObserver.observe(msgWindow.openFolder, null, null);
 
-  // Do we have bug 523649? If not, override indexer shouldIndexFolder
-  if ( Gloda.shouldIndexFolder === undefined)
-  {
-    // override the gloda indexer to adjust which folders are indexed
-    GlodaIndexer.shouldIndexFolder = GlodaQuillaIndexerOverlay.shouldIndexFolder;
-    GlodaIndexer.shouldIndexFolder(null);
-  }
+  // override the gloda indexer to adjust which folders are indexed
+  GlodaFolder.prototype.__defineGetter__("indexingPriority", function getIndexingPriority() {
+    let returnValue = this._indexingPriority;
+    try {
+      let override = this.getXPCOMFolder()
+                         .getInheritedStringProperty("glodaDoIndex");
+      if (override == "false")
+        returnValue = this.kIndexingNeverPriority;
+      else if (override == "true")
+        returnValue =  Math.max(this.kIndexingDefaultPriority, returnValue);
+    } catch (e) {dump(e);}
+    //dump("get indexingPriority for " + this._prettyName + " is " + returnValue + "\n");
+    return returnValue;
+  });
 }
 
 var CreateGlodaquillaDbObserver = {
