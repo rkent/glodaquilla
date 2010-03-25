@@ -5,18 +5,18 @@
 
   <Description about='urn:mozilla:install-manifest'>
     <em:id>glodaquilla@mesquilla.com</em:id>
-    <em:version>0.3.0</em:version>
+    <em:version>0.3.1</em:version>
     <em:type>2</em:type> <!-- 2 is type 'extension' -->
     <em:name>GlodaQuilla</em:name>
     <em:homepageURL>http://www.mesquilla.com/extensions/glodaquilla</em:homepageURL>
     <em:creator>R Kent James</em:creator>
-    <em:description>Global Database columns for debug</em:description>
+    <em:description>Global Indexing enhancements</em:description>
     <!-- Thunderbird -->
     <em:targetApplication>
       <Description>
         <em:id>{3550f703-e582-4d05-9a08-453d09bdfdc6}</em:id>
         <em:minVersion>3.0pre</em:minVersion>
-        <em:maxVersion>3.0.*</em:maxVersion>
+        <em:maxVersion>3.2a1pre</em:maxVersion>
       </Description>
     </em:targetApplication>
   </Description>
