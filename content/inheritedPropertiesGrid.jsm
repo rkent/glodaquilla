@@ -39,6 +39,24 @@ const Cu = Components.utils;
 const catMan = Cc["@mozilla.org/categorymanager;1"]
                  .getService(Ci.nsICategoryManager);
 
+// we don't seem to have Application in a module :(
+var Application = null;
+
+// Thunderbird version
+try {
+  Application = Cc["@mozilla.org/steel/application;1"]
+                  .getService(Ci.extIApplication);
+} catch (e) {}
+
+// SeaMonkey version
+if (!Application)
+{
+  try {
+    Application = Cc["@mozilla.org/smile/application;1"]
+                    .getService(Ci.extIApplication);
+  } catch (e) {}
+}
+
 var InheritedPropertiesGrid = {
 
   /*
@@ -57,23 +75,40 @@ var InheritedPropertiesGrid = {
   addPropertyObject: function addPropertyObject(aPropertyObject)
   {
     /*
+     * Old method:
      * For each inherited property that has been registered with
      *  InheritedPropertiesGrid, the hidefor values are stored in the category
      *  manager. The "category" is "InheritedPropertiesGrid", each of the entry
      *  keys is toSource() version of the object. This is used to maintain a
      *  single shared registry of properties.
+     *
+     * New method: we store the object containing inherited properties using
+     *             Application.storage
      */
+    // old method, using eval from a category
     catMan.addCategoryEntry("InheritedPropertiesGrid",
                             aPropertyObject.property,
                             aPropertyObject.toSource(),
                             false /* aPersist */,
                             true /* aReplace */);
+    // new method, saving in a global context
+    let inheritedProperties = Application.storage.get("mesquillaInheritedProperties", {});
+    inheritedProperties[aPropertyObject.property] = aPropertyObject;
+    Application.storage.set("mesquillaInheritedProperties", inheritedProperties);
     return;
   },
 
   // given the property key, return the registered property object
   getPropertyObject: function getPropertyObject(aProperty)
   {
+    // new method: shared global context
+    try {
+      let inheritedProperties = Application.storage.get("mesquillaInheritedProperties", {});
+      let property = inheritedProperties[aProperty];
+      if (typeof property != 'undefined')
+        return property;
+    } catch (e) {} // error normal if old method was used
+    // old method: eval from a category entry
     let value = catMan.getCategoryEntry("InheritedPropertiesGrid", aProperty);
     if (value)
       return eval(value);
