@@ -45,6 +45,7 @@ inheritPane.prototype = {
      *  InheritedPropertiesGrid, the hidefor values are stored in the category
      *  manager as part of the property object.
      */
+     Components.utils.import("resource://" + this.chromePackageName + "/inheritedPropertiesGrid.jsm");
      let catEnum = catMan.enumerateCategory("InheritedPropertiesGrid");
      let type = server.type;
      let show = false; // have we found a non-hidden entry?
@@ -52,8 +53,7 @@ inheritPane.prototype = {
        let entry = catEnum.getNext()
                           .QueryInterface(Components.interfaces.nsISupportsCString)
                           .data;
-       let value = catMan.getCategoryEntry("InheritedPropertiesGrid", entry);
-       let propertyObject = eval(value);
+       let propertyObject = InheritedPropertiesGrid.getPropertyObject(entry);
        if (propertyObject.hidefor.indexOf(type) == -1) // then we should show this entry
          show = true;
      }
