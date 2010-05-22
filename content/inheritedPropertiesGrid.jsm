@@ -75,17 +75,14 @@ var InheritedPropertiesGrid = {
   addPropertyObject: function addPropertyObject(aPropertyObject)
   {
     /*
-     * Old method:
-     * For each inherited property that has been registered with
-     *  InheritedPropertiesGrid, the hidefor values are stored in the category
-     *  manager. The "category" is "InheritedPropertiesGrid", each of the entry
-     *  keys is toSource() version of the object. This is used to maintain a
-     *  single shared registry of properties.
-     *
      * New method: we store the object containing inherited properties using
      *             Application.storage
+     *
+     *             The new method still uses the category to store the names of
+     *             the inherited properties, but the value is not important.
+     *             Need to eliminate the ".toSource" which was needed by the old
+     *             method.
      */
-    // old method, using eval from a category
     catMan.addCategoryEntry("InheritedPropertiesGrid",
                             aPropertyObject.property,
                             aPropertyObject.toSource(),
@@ -107,11 +104,7 @@ var InheritedPropertiesGrid = {
       let property = inheritedProperties[aProperty];
       if (typeof property != 'undefined')
         return property;
-    } catch (e) {} // error normal if old method was used
-    // old method: eval from a category entry
-    let value = catMan.getCategoryEntry("InheritedPropertiesGrid", aProperty);
-    if (value)
-      return eval(value);
+    } catch (e) {} // perhaps something is still using the old method?
     throw "Inherited property " + aProperty + " not registered";
     return null;
    },

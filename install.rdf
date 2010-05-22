@@ -5,7 +5,7 @@
 
   <Description about='urn:mozilla:install-manifest'>
     <em:id>glodaquilla@mesquilla.com</em:id>
-    <em:version>0.3.1</em:version>
+    <em:version>0.3.2</em:version>
     <em:type>2</em:type> <!-- 2 is type 'extension' -->
     <em:name>GlodaQuilla</em:name>
     <em:homepageURL>http://www.mesquilla.com/extensions/glodaquilla</em:homepageURL>
