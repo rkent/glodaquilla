@@ -49,9 +49,10 @@
   const glodaquillaStrings = Cc["@mozilla.org/intl/stringbundle;1"]
                              .getService(Ci.nsIStringBundleService)
                              .createBundle("chrome://glodaquilla/locale/glodaquilla.properties");
+  let installedVersion = "unknown";
   
   // preferences
-  self.PREF_DisableFolderProps = "extensions.glodaquilla.disableFolderProps";
+  self.PREF_EnableInheritedProps = "extensions.glodaquilla.enableInheritedProps";
 
   // global scope variables
   self.onLoad = function onLoad(e)
@@ -64,12 +65,12 @@
     let rootprefs = Cc["@mozilla.org/preferences-service;1"]
                        .getService(Ci.nsIPrefService)
                        .getBranch("");
-    let disableFolderProps = false;
+    let enableInheritedProps = true;
     try {
-      disableFolderProps = rootprefs.getBoolPref(self.PREF_DisableFolderProps);
+      enableInheritedProps = rootprefs.getBoolPref(self.PREF_EnableInheritedProps);
     } catch (e) {}
 
-    if (!disableFolderProps)
+    if (enableInheritedProps)
       InheritedPropertiesGrid.addPropertyObject(self.glodaDoIndex);
 
     // override the gloda indexer to adjust which folders are indexed
@@ -80,11 +81,11 @@
       let rootprefs = Cc["@mozilla.org/preferences-service;1"]
                         .getService(Ci.nsIPrefService)
                         .getBranch("");
-      let disableFolderProps = false;
+      let enableInheritedProps = true;
       try {
-       disableFolderProps = rootprefs.getBoolPref("extensions.glodaquilla.disableFolderProps");
+       enableInheritedProps = rootprefs.getBoolPref("extensions.glodaquilla.enableInheritedProps");
       } catch (e) {}
-      if (disableFolderProps)
+      if (!enableInheritedProps)
         return returnValue;
 
       // If we are using inherited properties, we will use the default for
@@ -131,15 +132,21 @@
 
     let prefs = Cc["@mozilla.org/preferences-service;1"]
                   .getService(Ci.nsIPrefBranch2);
-    prefs.addObserver(self.PREF_DisableFolderProps, self, false);
-    self.syncProperties();
+    prefs.addObserver(self.PREF_EnableInheritedProps, self, false);
+
+    try {
+      installedVersion = rootprefs.getCharPref("extensions.glodaquilla.installedVersion");
+    } catch (e) {}
+    if (installedVersion != "0.3.2")
+      self.syncProperties(true);
+    rootprefs.setCharPref("extensions.glodaquilla.installedVersion", "0.3.2");
   },
 
   self.onUnload = function onUnload(e)
   {
     let prefs = Cc["@mozilla.org/preferences-service;1"]
                   .getService(Ci.nsIPrefBranch2);
-    prefs.removeObserver(self.PREF_DisableFolderProps, self);
+    prefs.removeObserver(self.PREF_EnableInheritedProps, self);
   };
 
   self.observe = function observe(aSubject, aTopic, aData)
@@ -150,20 +157,22 @@
     else if (aTopic == "nsPref:changed")
     { 
       let prefs = aSubject.QueryInterface(Ci.nsIPrefBranch)
-      if (aData == self.PREF_DisableFolderProps)
+      if (aData == self.PREF_EnableInheritedProps)
       {
         try {
-          disableFolderProps = prefs.getBoolPref(self.PREF_DisableFolderProps);
-          if (disableFolderProps)
+          enableInheritedProps = prefs.getBoolPref(self.PREF_EnableInheritedProps);
+          if (!enableInheritedProps)
           {
             // this is a new function
             if (typeof InheritedPropertiesGrid.removePropertyObject != "undefined")
               InheritedPropertiesGrid.removePropertyObject(self.glodaDoIndex);
           }
           else
+          {
             InheritedPropertiesGrid.addPropertyObject(self.glodaDoIndex);
+            self.syncProperties(false);
+          } 
         } catch (e) {Cu.reportError(e);}
-        self.syncProperties();
       }
     }
   };
@@ -183,12 +192,13 @@
    *  indexingPriority.
    *
    */
-  self.syncProperties = function syncProperties()
+  self.syncProperties = function syncProperties(aDoBoth)
   {
 
     const accountManager = Cc["@mozilla.org/messenger/account-manager;1"]
                              .getService(Ci.nsIMsgAccountManager);
-    const kIndexingNeverPriority = -1;
+    const kIndexingDefaultPriority = GlodaFolder.prototype.kIndexingDefaultPriority;
+    const kIndexingNeverPriority = GlodaFolder.prototype.kIndexingNeverPriority;
     const kNone = -2;
     const kUnchanged = -3;
     // loop over all folders
@@ -206,6 +216,10 @@
         let glodaFolder  = GlodaDatastore._mapFolder(folder);
         indexingPriority = glodaFolder._indexingPriority;
         let glodaDoIndex = folder.getStringProperty("glodaDoIndex");
+        if (!glodaDoIndex)
+          glodaDoIndex = "";
+        let defaultFolderPriority =
+            GlodaDatastore.getDefaultIndexingPriority(folder);
 
         let changedGlodaDoIndex = "notchanged";
         let changedIndexingPriority = kUnchanged;
@@ -221,12 +235,32 @@
          */
 
         // Propagate glodaquilla property to core
-          if (glodaDoIndex == "false")
-            changedIndexingPriority = kIndexingNeverPriority;
+        if (glodaDoIndex == "false")
+          changedIndexingPriority = kIndexingNeverPriority;
+        else if (glodaDoIndex == "")
+          changedIndexingPriority = defaultFolderPriority;
+
+        // If glodaDoIndex is Yes but don't inherit, then we want to remove any
+        //  inhibiting from the core property.
+        if (glodaDoIndex == "true")
+        {
+          if (defaultFolderPriority != kIndexingNeverPriority)
+            changedIndexingPriority = defaultFolderPriority;
+          else
+            changedIndexingPriority = kIndexingDefaultPriority;
+        }
 
         // Propagate core to glodaquilla
-          if (indexingPriority == kIndexingNeverPriority)
-            changedGlodaDoIndex = "false";
+        if (indexingPriority == kIndexingNeverPriority)
+          changedGlodaDoIndex = "false";
+        else if (indexingPriority == defaultFolderPriority)
+          changedGlodaDoIndex = "";
+        /* core does not seem to be able to set this
+        else if (defaultFolderPriority == kIndexingNeverPriority &&
+                 defaultFolderPriority != indexingPriority)
+        // core must have enabled indexing of a normally disabled folder
+          changedGlodaDoIndex = "true";
+        */
 
         // update properties if needed
         if (changedGlodaDoIndex != "notchanged" &&
@@ -234,11 +268,26 @@
         {
           folder.setStringProperty("glodaDoIndex", changedGlodaDoIndex);
         }
-        if (changedIndexingPriority != kUnchanged &&
+
+        // We only update the indexingPriority once, to assist people
+        //  migrating from existing glodaQuilla installs
+        if (aDoBoth &&
+            changedIndexingPriority != kUnchanged &&
             changedIndexingPriority != indexingPriority)
         {
           Gloda.setFolderIndexingPriority(folder, changedIndexingPriority);
+          glodaFolder._indexingPriority = changedIndexingPriority;
         }
+        /* debug
+        if (folder.name == 'bird' && folder instanceof Ci.nsIMsgImapMailFolder)
+        {
+          dump(folder.name + ': defaultFolderPriority = ' + defaultFolderPriority +
+               ' indexingPriority = ' + indexingPriority + '\n');
+          dump('glodaDoIndex: ' + glodaDoIndex + ' changedGlodaDoIndex: ' + changedGlodaDoIndex + '\n');
+          newIndexingPriority = glodaFolder._indexingPriority;
+          dump('newIndexPriority = ' + newIndexingPriority + '\n');
+        }
+        /**/
       }
     }
   }

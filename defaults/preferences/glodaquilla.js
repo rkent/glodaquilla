@@ -1,2 +1,3 @@
-// Shall we disable out inherited properties?
-pref("extensions.glodaquilla.disableFolderProps", false);
+// Shall we use our inherited properties?
+pref("extensions.glodaquilla.enableInheritedProps", true);
+pref("extensions.glodaquilla.installedVersion", "unknown");

@@ -54,18 +54,13 @@
     // We won't add anything if glodaquilla properties are disabled
     let prefs = Cc["@mozilla.org/preferences-service;1"]
                   .getService(Ci.nsIPrefBranch);
-    let disableFolderProps = false;
+    let enableInheritedProps = true;
     try {
-      disableFolderProps = prefs.getBoolPref("extensions.glodaquilla.disableFolderProps");
+      enableInheritedProps = prefs.getBoolPref("extensions.glodaquilla.enableInheritedProps");
     } catch (e) {}
 
-    if (disableFolderProps)
-    {
-      /**
-       * There may be existing ...
-       */
+    if (!enableInheritedProps)
       return;
-    }
 
     let standardItem = document.getElementById('folderIncludeInGlobalSearch');
     standardItem.setAttribute("hidden", "true");
@@ -93,8 +88,66 @@
 
   self.onAcceptInherit = function glodaDoIndexOnAcceptInherit()
   {
+    try {
+    let oldValue = folder.getStringProperty("glodaDoIndex");
+    if (!oldValue)
+      oldValue = "";
     InheritedPropertiesGrid.onAcceptInherit("glodaDoIndex", folder, document);
-  };
+    let glodaDoIndex = folder.getStringProperty("glodaDoIndex");
+    if (!glodaDoIndex)
+      glodaDoIndex = "";
+
+    // We need to propagate the glodaquilla values back to the core values,
+    //  to keep them approximately in sync.
+    if (glodaDoIndex == oldValue)
+      return;
+
+    Cu.import("resource:///modules/gloda/datastore.js");
+    Cu.import("resource:///modules/gloda/datamodel.js");
+    Cu.import("resource:///modules/gloda/gloda.js");
+
+    const kIndexingDefaultPriority = GlodaFolder.prototype.kIndexingDefaultPriority;
+    const kIndexingNeverPriority = GlodaFolder.prototype.kIndexingNeverPriority;
+    const kNone = -2;
+    const kUnchanged = -3;
+
+    let glodaFolder  = GlodaDatastore._mapFolder(folder);
+    indexingPriority = glodaFolder._indexingPriority;
+    let defaultFolderPriority =
+        GlodaDatastore.getDefaultIndexingPriority(folder);
+    let changedIndexingPriority = kUnchanged;
+    /*
+    dump('glodaDoIndex: <' + glodaDoIndex +
+         '>  indexingPriority: <' + indexingPriority +
+         '>  defaultFolderPriority: <' + defaultFolderPriority +
+         '>\n');
+    */
+
+    // Propagate glodaquilla property to core
+    if (glodaDoIndex == "false")
+      changedIndexingPriority = kIndexingNeverPriority;
+    else if (glodaDoIndex == "")
+      changedIndexingPriority = defaultFolderPriority;
+
+    // If glodaDoIndex is Yes but don't inherit, then we want to remove any
+    //  inhibiting from the core property.
+    if (glodaDoIndex == "true")
+    {
+      if (defaultFolderPriority != kIndexingNeverPriority)
+        changedIndexingPriority = defaultFolderPriority;
+      else
+        changedIndexingPriority = kIndexingDefaultPriority;
+    }
+
+    if (changedIndexingPriority != kUnchanged
+        // && changedIndexingPriority != indexingPriority
+       )
+    {
+      Gloda.setFolderIndexingPriority(folder, changedIndexingPriority);
+      glodaFolder._indexingPriority = changedIndexingPriority;
+    }  
+  } catch (e) {Cu.reportError(e);};
+  }
 
 
 })();
