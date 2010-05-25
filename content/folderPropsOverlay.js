@@ -31,7 +31,6 @@
  // filter properties xul to make a normal overlay possible, so instead we have
  // to add our xul dynamically.
 
-Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
  
 (function()
 {
@@ -41,10 +40,12 @@ Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
   // local shorthand for the global reference
   let self = this.glodaquillaFolderProps;
 
-  // module-level variables
   const Cc = Components.classes;
   const Ci = Components.interfaces;
   const Cu = Components.utils;
+  
+  // module-level variables
+  Cu.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
 
   let folder; // nsIMsgFolder passed to the window
 
@@ -58,7 +59,6 @@ Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
       disableFolderProps = prefs.getBoolPref("extensions.glodaquilla.disableFolderProps");
     } catch (e) {}
 
-    dump('disableFolderProps is ' + disableFolderProps + '\n');
     if (disableFolderProps)
     {
       /**
@@ -79,7 +79,6 @@ Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
     window.gInheritTarget = folder;
 
     // create or get the rows from the inherit grid
-    dump("folderProps getInheritRows\n");
     let rows = InheritedPropertiesGrid.getInheritRows(document);
     let row = InheritedPropertiesGrid.createInheritRow("glodaDoIndex", folder, document);
     if (row)  // false means another extension is handling this, so quit
