@@ -11,6 +11,7 @@
     <em:homepageURL>http://www.mesquilla.com/extensions/glodaquilla</em:homepageURL>
     <em:creator>R Kent James</em:creator>
     <em:description>Global Indexing enhancements</em:description>
+    <em:optionsURL>chrome://glodaquilla/content/options.xul</em:optionsURL>
     <!-- Thunderbird -->
     <em:targetApplication>
       <Description>

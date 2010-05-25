@@ -50,10 +50,28 @@ Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
 
   self.onLoad = function onLoad(e)
   {
-    folder = window.arguments[0].folder;
+    // We won't add anything if glodaquilla properties are disabled
+    let prefs = Cc["@mozilla.org/preferences-service;1"]
+                  .getService(Ci.nsIPrefBranch);
+    let disableFolderProps = false;
+    try {
+      disableFolderProps = prefs.getBoolPref("extensions.glodaquilla.disableFolderProps");
+    } catch (e) {}
 
+    dump('disableFolderProps is ' + disableFolderProps + '\n');
+    if (disableFolderProps)
+    {
+      /**
+       * There may be existing ...
+       */
+      return;
+    }
+
+    let standardItem = document.getElementById('folderIncludeInGlobalSearch');
+    standardItem.setAttribute("hidden", "true");
     // Setup UI for the "glodaDoIndex" inherited property, but only for
     //  imap or local folders (which includes rss).
+    folder = window.arguments[0].folder;
     if (!(folder instanceof Ci.nsIMsgLocalMailFolder) &&
         !(folder instanceof Ci.nsIMsgImapMailFolder))
       return;
@@ -61,6 +79,7 @@ Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
     window.gInheritTarget = folder;
 
     // create or get the rows from the inherit grid
+    dump("folderProps getInheritRows\n");
     let rows = InheritedPropertiesGrid.getInheritRows(document);
     let row = InheritedPropertiesGrid.createInheritRow("glodaDoIndex", folder, document);
     if (row)  // false means another extension is handling this, so quit
@@ -76,7 +95,8 @@ Components.utils.import("resource://glodaquilla/inheritedPropertiesGrid.jsm");
   self.onAcceptInherit = function glodaDoIndexOnAcceptInherit()
   {
     InheritedPropertiesGrid.onAcceptInherit("glodaDoIndex", folder, document);
-  }
+  };
+
 
 })();
 

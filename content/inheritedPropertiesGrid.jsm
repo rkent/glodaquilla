@@ -95,6 +95,28 @@ var InheritedPropertiesGrid = {
     return;
   },
 
+  // unregister a property object
+  removePropertyObject: function removePropertyObject(aPropertyObject)
+  {
+    /*
+     * New method: we store the object containing inherited properties using
+     *             Application.storage
+     *
+     *             The new method still uses the category to store the names of
+     *             the inherited properties, but the value is not important.
+     *             Need to eliminate the ".toSource" which was needed by the old
+     *             method.
+     */
+    catMan.deleteCategoryEntry("InheritedPropertiesGrid",
+                               aPropertyObject.property,
+                               false /* aPersist */);
+    // new method, saving in a global context
+    let inheritedProperties = Application.storage.get("mesquillaInheritedProperties", {});
+    inheritedProperties[aPropertyObject.property] = null;
+    Application.storage.set("mesquillaInheritedProperties", inheritedProperties);
+    return;
+  },
+
   // given the property key, return the registered property object
   getPropertyObject: function getPropertyObject(aProperty)
   {
