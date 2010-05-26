@@ -60,6 +60,7 @@
   // global scope variables
   self.onLoad = function onLoad(e)
   {
+    //dump('glodaquilla onLoad\n');
     // enable observer to add custom columns
     let ObserverService = Components.classes["@mozilla.org/observer-service;1"]
                                     .getService(Components.interfaces.nsIObserverService);
@@ -82,7 +83,7 @@
       // Just give the usual value if inherited properties are disabled
       let enableInheritedProps = true;
       try {
-       enableInheritedProps = rootprefs.getBoolPref("extensions.glodaquilla.enableInheritedProps");
+       enableInheritedProps = rootprefs.getBoolPref(self.PREF_EnableInheritedProps);
       } catch (e) {}
       if (!enableInheritedProps)
         return returnValue;
@@ -188,6 +189,7 @@
    */
   self.syncProperties = function syncProperties(aDoBoth)
   {
+    //dump('glodaquilla syncProperties\n');
     // this does nothing on TB 3.0
     if (typeof GlodaDatastore.getDefaultIndexingPriority == "undefined")
       return;
@@ -247,10 +249,13 @@
         }
 
         // Propagate core to glodaquilla
-        if (indexingPriority == kIndexingNeverPriority)
-          changedGlodaDoIndex = "false";
-        else if (indexingPriority == defaultFolderPriority)
-          changedGlodaDoIndex = "";
+        if (glodaDoIndex == "")
+        {
+          if (indexingPriority == kIndexingNeverPriority)
+            changedGlodaDoIndex = "false";
+          else if (indexingPriority == defaultFolderPriority)
+            changedGlodaDoIndex = "";
+        }
         /* core does not seem to be able to set this
         else if (defaultFolderPriority == kIndexingNeverPriority &&
                  defaultFolderPriority != indexingPriority)
@@ -445,6 +450,10 @@
         }
         if (showMigration)
           self.openContentTab('http://mesquilla.com/extensions/glodaquilla/glodaquilla-update-for-thunderbird-3-1/');
+        else
+          // If the user has not previously used GlodaQuilla's indexing suppression, then
+          //  don't enable it.
+          rootprefs.setBoolPref(self.PREF_EnableInheritedProps, false);
         self.syncProperties(true);
         rootprefs.setCharPref("extensions.glodaquilla.installedTbVersion", "3.1");
       }
