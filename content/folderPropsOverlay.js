@@ -62,8 +62,10 @@
     if (!enableInheritedProps)
       return;
 
+    // Hide TB 3.1's indexing priority option
     let standardItem = document.getElementById('folderIncludeInGlobalSearch');
-    standardItem.setAttribute("hidden", "true");
+    if (standardItem)
+      standardItem.setAttribute("hidden", "true");
     // Setup UI for the "glodaDoIndex" inherited property, but only for
     //  imap or local folders (which includes rss).
     folder = window.arguments[0].folder;
@@ -105,6 +107,10 @@
     Cu.import("resource:///modules/gloda/datastore.js");
     Cu.import("resource:///modules/gloda/datamodel.js");
     Cu.import("resource:///modules/gloda/gloda.js");
+
+     // there is nothing to sync on TB 3.0
+    if (typeof GlodaDatastore.getDefaultIndexingPriority == "undefined")
+      return;
 
     const kIndexingDefaultPriority = GlodaFolder.prototype.kIndexingDefaultPriority;
     const kIndexingNeverPriority = GlodaFolder.prototype.kIndexingNeverPriority;

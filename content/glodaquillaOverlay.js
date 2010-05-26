@@ -50,6 +50,9 @@
                              .getService(Ci.nsIStringBundleService)
                              .createBundle("chrome://glodaquilla/locale/glodaquilla.properties");
   let installedVersion = "unknown";
+  let rootprefs = Cc["@mozilla.org/preferences-service;1"]
+                     .getService(Ci.nsIPrefService)
+                     .getBranch("");
   
   // preferences
   self.PREF_EnableInheritedProps = "extensions.glodaquilla.enableInheritedProps";
@@ -57,19 +60,18 @@
   // global scope variables
   self.onLoad = function onLoad(e)
   {
+    // enable observer to add custom columns
     let ObserverService = Components.classes["@mozilla.org/observer-service;1"]
                                     .getService(Components.interfaces.nsIObserverService);
     ObserverService.addObserver(self, "MsgCreateDBView", false);
     self.observe(msgWindow.openFolder, "MsgCreateDBView", null);
 
-    let rootprefs = Cc["@mozilla.org/preferences-service;1"]
-                       .getService(Ci.nsIPrefService)
-                       .getBranch("");
+
+    // Add inherited folder property if enabled
     let enableInheritedProps = true;
     try {
       enableInheritedProps = rootprefs.getBoolPref(self.PREF_EnableInheritedProps);
     } catch (e) {}
-
     if (enableInheritedProps)
       InheritedPropertiesGrid.addPropertyObject(self.glodaDoIndex);
 
@@ -78,9 +80,6 @@
 
       let returnValue = this._indexingPriority;
       // Just give the usual value if inherited properties are disabled
-      let rootprefs = Cc["@mozilla.org/preferences-service;1"]
-                        .getService(Ci.nsIPrefService)
-                        .getBranch("");
       let enableInheritedProps = true;
       try {
        enableInheritedProps = rootprefs.getBoolPref("extensions.glodaquilla.enableInheritedProps");
@@ -92,7 +91,7 @@
       //  the folder as the base value
       try {
         let msgFolder = this.getXPCOMFolder();
-        let defaultPriority = GlodaDatastore.getDefaultIndexingPriority(msgFolder);
+        let defaultPriority = self.getDefaultIndexingPriority(msgFolder);
         let glodaFolder = this;
         let override = msgFolder.getInheritedStringProperty("glodaDoIndex");
         // watchout for nulls
@@ -134,12 +133,7 @@
                   .getService(Ci.nsIPrefBranch2);
     prefs.addObserver(self.PREF_EnableInheritedProps, self, false);
 
-    try {
-      installedVersion = rootprefs.getCharPref("extensions.glodaquilla.installedVersion");
-    } catch (e) {}
-    if (installedVersion != "0.3.2")
-      self.syncProperties(true);
-    rootprefs.setCharPref("extensions.glodaquilla.installedVersion", "0.3.2");
+    self.updateVersion();
   },
 
   self.onUnload = function onUnload(e)
@@ -194,7 +188,9 @@
    */
   self.syncProperties = function syncProperties(aDoBoth)
   {
-
+    // this does nothing on TB 3.0
+    if (typeof GlodaDatastore.getDefaultIndexingPriority == "undefined")
+      return;
     const accountManager = Cc["@mozilla.org/messenger/account-manager;1"]
                              .getService(Ci.nsIMsgAccountManager);
     const kIndexingDefaultPriority = GlodaFolder.prototype.kIndexingDefaultPriority;
@@ -219,7 +215,7 @@
         if (!glodaDoIndex)
           glodaDoIndex = "";
         let defaultFolderPriority =
-            GlodaDatastore.getDefaultIndexingPriority(folder);
+            self.getDefaultIndexingPriority(folder);
 
         let changedGlodaDoIndex = "notchanged";
         let changedIndexingPriority = kUnchanged;
@@ -376,13 +372,117 @@
         return (aFolder.type != "nntp");
 
       // get the default value from gloda
-      let defaultPriority = GlodaDatastore.getDefaultIndexingPriority(aFolder);
+      let defaultPriority = self.getDefaultIndexingPriority(aFolder);
       return (defaultPriority != GlodaFolder.prototype.kIndexingNeverPriority);
     },
     name: glodaquillaStrings.GetStringFromName("indexInGlobalDatabase"),
     accesskey: glodaquillaStrings.GetStringFromName("indexInGlobalDatabase.accesskey"),
     property: "glodaDoIndex",
     hidefor: "nntp"
+  };
+
+  // from utilityOverlay.js
+  self.openContentTab = function openContentTab(url)
+  {
+    let tabmail = document.getElementById("tabmail");
+    if (!tabmail) {
+      // Try opening new tabs in an existing 3pane window
+      let mail3PaneWindow = Components.classes["@mozilla.org/appshell/window-mediator;1"]
+                                      .getService(Components.interfaces.nsIWindowMediator)
+                                      .getMostRecentWindow("mail:3pane");
+      if (mail3PaneWindow) {
+        tabmail = mail3PaneWindow.document.getElementById("tabmail");
+        mail3PaneWindow.focus();
+      }
+    }
+
+    if (tabmail)
+      tabmail.openTab("contentTab", {contentPage: url});
+    else
+      window.openDialog("chrome://messenger/content/", "_blank",
+                        "chrome,dialog=no,all", null,
+                        { tabType: "contentTab",
+                          tabParams: {contentPage: url} });
+  };
+
+  self.updateVersion = function updateVersion()
+  {
+    /*
+     * When a user first installs Thunderbird 3.1, then we have the opportunity to
+     *  synchronize the new folder indexing controls with those of GlodaQuilla. When
+     *  installation of this is detected, display a page that gives migration instructions.
+     */
+    installedTbVersion = rootprefs.getCharPref("extensions.glodaquilla.installedTbVersion");
+    if (installedTbVersion != "3.1")
+    {
+      // See if this is really 3.1 with the new support for indexingPriority
+      let isTb31 = (typeof GlodaDatastore.getDefaultIndexingPriority != "undefined");
+      if (isTb31)
+      {
+        // If the user previously had some inherited properties set, then we want
+        //  to show them the migration screen. Scan for properties.
+        //
+        let showMigration = false;
+        const accountManager = Cc["@mozilla.org/messenger/account-manager;1"]
+                                 .getService(Ci.nsIMsgAccountManager);
+        // loop over all folders
+        let servers = accountManager.allServers;
+        for each (var server in fixIterator(servers, Ci.nsIMsgIncomingServer))
+        {
+          let rootFolder = server.rootFolder;
+          let allFolders = Cc["@mozilla.org/supports-array;1"]
+                             .createInstance(Ci.nsISupportsArray);
+          rootFolder.ListDescendents(allFolders);
+          for each (let folder in fixIterator(allFolders, Ci.nsIMsgFolder))
+          {
+            let glodaDoIndex = folder.getInheritedStringProperty("glodaDoIndex");
+            if (glodaDoIndex && glodaDoIndex.length)
+            {
+              showMigration = true;
+              break;
+            }
+          }
+        }
+        if (showMigration)
+          self.openContentTab('http://mesquilla.com/extensions/glodaquilla/glodaquilla-update-for-thunderbird-3-1/');
+        self.syncProperties(true);
+        rootprefs.setCharPref("extensions.glodaquilla.installedTbVersion", "3.1");
+      }
+    }
+  };
+
+  // copied from gloda to maintain 3.0/3.1 compatibility
+  self.getDefaultIndexingPriority = function getDefaultIndexingPriority(aFolder)
+  {
+    let indexingPriority = GlodaFolder.prototype.kIndexingDefaultPriority;
+    // Do not walk into trash/junk folders.
+    // Queue folders should also be ignored just because messages should not
+    //  spend much time in there.
+    // We hate newsgroups, and public IMAP folders are similar.
+    // Other user IMAP folders should be ignored because it's not this user's
+    //  mail.
+    if (aFolder.flags & (Ci.nsMsgFolderFlags.Trash
+                         | Ci.nsMsgFolderFlags.Junk
+                         | Ci.nsMsgFolderFlags.Queue
+                         | Ci.nsMsgFolderFlags.Newsgroup
+                         // In unit testing at least folders can be confusingly
+                         //  labeled ImapPublic when they should not be.  Or
+                         //  at least I don't think they should be.  So they're
+                         //  legit for now.
+                         //| Ci.nsMsgFolderFlags.ImapPublic
+                         //| Ci.nsMsgFolderFlags.ImapOtherUser
+                        ))
+      indexingPriority = GlodaFolder.prototype.kIndexingNeverPriority;
+    else if (aFolder.flags & Ci.nsMsgFolderFlags.Inbox)
+      indexingPriority = GlodaFolder.prototype.kIndexingInboxPriority;
+    else if (aFolder.flags & Ci.nsMsgFolderFlags.SentMail)
+      indexingPriority = GlodaFolder.prototype.kIndexingSentMailPriority;
+    else if (aFolder.flags & Ci.nsMsgFolderFlags.Favorite)
+      indexingPriority = GlodaFolder.prototype.kIndexingFavoritePriority;
+    else if (aFolder.flags & Ci.nsMsgFolderFlags.CheckNew)
+      indexingPriority = GlodaFolder.prototype.kIndexingCheckNewPriority;
+
+    return indexingPriority;
   };
 
 })();
