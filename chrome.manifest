@@ -4,3 +4,6 @@ overlay     chrome://messenger/content/messenger.xul      chrome://glodaquilla/c
 overlay     chrome://messenger/content/folderProps.xul    chrome://glodaquilla/content/folderPropsOverlay.xul
 skin        glodaquilla classic   skin/
 locale      glodaquilla en-US     locale/en-US/
+component   {f2809396-1cd1-12b2-841b-8e15f007c699} components/inheritPane-service.js
+contract    @mozilla.org/accountmanager/extension;1?name=inheritPane {f2809396-1cd1-12b2-841b-8e15f007c699}
+category    mailnews-accountmanager-extensions mesquilla-extension-inherit-pane @mozilla.org/accountmanager/extension;1?name=inheritPane

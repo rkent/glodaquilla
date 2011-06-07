@@ -69,6 +69,7 @@ inheritPane.prototype = {
                        entry: "mesquilla extension inherit pane"}]
 };
 
-function NSGetModule(compMgr, fileSpec) {
-  return XPCOMUtils.generateModule([inheritPane]);
-}
+if (XPCOMUtils.generateNSGetFactory)
+  var NSGetFactory = XPCOMUtils.generateNSGetFactory([inheritPane]);
+else
+  var NSGetModule= XPCOMUtils.generateNSGetModule([inheritPane]);
